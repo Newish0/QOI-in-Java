@@ -60,16 +60,27 @@ public class Encoder {
         } // for
 
         int maxSize = width * height * (channels + 1) + QOI_HEADER_SIZE + QOI_END_MARKER_SIZE;
-        ByteBuffer outputBuf = ByteBuffer.allocate(maxSize); // NOTE: initial order of a byte buffer is BIG_ENDIAN.
+        byte[] bytes = new byte[maxSize]; // Stores all bytes of the encoded QOI
+        int index = 0;
 
         // Write the header
-        outputBuf.put(new String("qoif").getBytes()); // magic bytes "qoif"
-        outputBuf.putInt(width); // uint32_t width , image width in pixels (BE)
-        outputBuf.putInt(height); // uint32_t height, image height in pixels (BE)
-        outputBuf.put((byte) (channels)); // uint8_t channels, 3 = RGB, 4 = RGBA
-        outputBuf.put((byte) (0)); // uint8_t colorspace, 0 = sRGB with linear alpha, 1 = all channels linear
+        ByteBuffer headerByteBuffer = ByteBuffer.allocate(14); // NOTE: initial order of a byte buffer is BIG_ENDIAN.
+        headerByteBuffer.put(new String("qoif").getBytes()); // magic bytes "qoif"
+        headerByteBuffer.putInt(width); // uint32_t width , image width in pixels (BE)
+        headerByteBuffer.putInt(height); // uint32_t height, image height in pixels (BE)
+        headerByteBuffer.put((byte) (channels)); // uint8_t channels, 3 = RGB, 4 = RGBA
+        headerByteBuffer.put((byte) (0)); // uint8_t colorspace, 0 = sRGB with linear alpha, 1 = all channels linear
+
+        // Add header into bytes array
+        byte[] header = headerByteBuffer.array();
+
+        for (byte b : header) {
+            bytes[index++] = b;
+        } // for
 
         int offset = 0; // The current pixel number counter
+
+        
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 Color color = new Color(img.getRGB(x, y), channels == 4);
@@ -79,7 +90,7 @@ public class Encoder {
                 if (color.equals(prevColor)) {
                     run++;
                     if (run == 62 || offset == lastPixel) {
-                        outputBuf.put((byte) (QOI_OP_RUN | (run - 1)));
+                        bytes[index++] = (byte) (QOI_OP_RUN | (run - 1));
                         run = 0;
                     }
 
@@ -89,7 +100,7 @@ public class Encoder {
                     // If there is an existing run, but current pixel have changed,
                     // encode the run (and resets it) before moving onto the current pixel
                     if (run > 0) {
-                        outputBuf.put((byte) (QOI_OP_RUN | (run - 1)));
+                        bytes[index++] = (byte) (QOI_OP_RUN | (run - 1));
                         run = 0;
                     }
 
@@ -101,8 +112,7 @@ public class Encoder {
                     // index in array.
                     // Otherwise, this is a new color; procced to other compression methods
                     if (color.equals(seenPixels[hash])) {
-                        outputBuf.put((byte) (QOI_OP_INDEX | hash));
-
+                        bytes[index++] = (byte) (QOI_OP_INDEX | hash);
                     } else {
                         seenPixels[hash] = color; // Record color into seenPixels.
 
@@ -122,35 +132,35 @@ public class Encoder {
                                     && (diff[1] >= -2 && diff[1] <= 1)
                                     && (diff[2] >= -2 && diff[2] <= 1)) {
 
-                                outputBuf.put((byte) (QOI_OP_DIFF
+                                bytes[index++] = (byte) (QOI_OP_DIFF
                                         | ((diff[0] + 2) << 4)
                                         | ((diff[1] + 2) << 2)
-                                        | ((diff[2] + 2) << 0)));
+                                        | ((diff[2] + 2) << 0));
 
                             } else if ((diff[1] >= -32 && diff[1] <= 31)
                                     && (dr_dg >= -8 && dr_dg <= 7)
                                     && (db_dg >= -8 && db_dg <= 7)) {
 
-                                outputBuf.put((byte) (QOI_OP_LUMA
-                                        | (diff[1] + 32)));
+                                bytes[index++] = (byte) (QOI_OP_LUMA
+                                        | (diff[1] + 32));
 
-                                outputBuf.put((byte) (((dr_dg + 8) << 4) | (db_dg + 8)));
+                                bytes[index++] = (byte) (((dr_dg + 8) << 4) | (db_dg + 8));
 
                             } else {
-                                outputBuf.put(QOI_OP_RGB);
-                                outputBuf.put((byte) color.getRed());
-                                outputBuf.put((byte) color.getGreen());
-                                outputBuf.put((byte) color.getBlue());
+                                bytes[index++] = QOI_OP_RGB;
+                                bytes[index++] = (byte) color.getRed();
+                                bytes[index++] = (byte) color.getGreen();
+                                bytes[index++] = (byte) color.getBlue();
                             } // if elses - difference in chroma, luma, or full RGB
 
                         } else {
                             // Cannot use any other encoding method
                             // Encode as full RGBA pixel
-                            outputBuf.put(QOI_OP_RGBA);
-                            outputBuf.put((byte) color.getRed());
-                            outputBuf.put((byte) color.getGreen());
-                            outputBuf.put((byte) color.getBlue());
-                            outputBuf.put((byte) color.getAlpha());
+                            bytes[index++] = QOI_OP_RGBA;
+                            bytes[index++] = (byte) color.getRed();
+                            bytes[index++] = (byte) color.getGreen();
+                            bytes[index++] = (byte) color.getBlue();
+                            bytes[index++] = (byte) color.getAlpha();
                         } // if else - difference (alpha)
                     } // if else - hash table
 
@@ -162,16 +172,16 @@ public class Encoder {
         } // for - x
 
         // Write end marker
-        outputBuf.put(QOI_END_MARKER);
+        for (byte b : QOI_END_MARKER) {
+            bytes[index++] = b;
+        } // for
 
-        // Convert outputBuf(ByteBuffer) into an byte array
-        byte[] bytes = outputBuf.array();
 
         // Write byte array as file
         File outputFile = new File("output.qoi");
         try (FileOutputStream outputStream = new FileOutputStream(outputFile)) {
             // Write until the end of file (not including unused bytes)
-            for (int i = 0; i < outputBuf.position(); i++) {
+            for (int i = 0; i < index; i++) {
                 outputStream.write(bytes[i]);
             } // for
         } catch (IOException e) {
@@ -193,7 +203,7 @@ public class Encoder {
 
         // Send image to encoder
         long startTime = System.currentTimeMillis();
-        EncoderByteBufferImplementation.encode(img);
+        Encoder.encode(img);
         System.out.println(System.currentTimeMillis() - startTime);
     } // main
 } // Encoder

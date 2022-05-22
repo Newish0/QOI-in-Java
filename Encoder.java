@@ -1,8 +1,11 @@
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.awt.image.ColorModel;
+import java.io.BufferedOutputStream;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.awt.Color;
@@ -80,7 +83,6 @@ public class Encoder {
 
         int offset = 0; // The current pixel number counter
 
-        
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 Color color = new Color(img.getRGB(x, y), channels == 4);
@@ -177,16 +179,24 @@ public class Encoder {
         } // for
 
 
+        long startTime = System.currentTimeMillis();
+
         // Write byte array as file
         File outputFile = new File("output.qoi");
         try (FileOutputStream outputStream = new FileOutputStream(outputFile)) {
+            
+            BufferedOutputStream bos = new BufferedOutputStream(outputStream);
+
             // Write until the end of file (not including unused bytes)
             for (int i = 0; i < index; i++) {
-                outputStream.write(bytes[i]);
+                bos.write(bytes[i]);
             } // for
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+
+        System.out.println(System.currentTimeMillis() - startTime);
 
     } // encode
 
@@ -202,8 +212,6 @@ public class Encoder {
         BufferedImage img = ImageIO.read(file);
 
         // Send image to encoder
-        long startTime = System.currentTimeMillis();
         Encoder.encode(img);
-        System.out.println(System.currentTimeMillis() - startTime);
     } // main
 } // Encoder

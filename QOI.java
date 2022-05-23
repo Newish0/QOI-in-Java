@@ -95,8 +95,8 @@ public class QOI {
                         run = 0;
                     }
 
-                    // There is a difference btween the current and previous pixel (cannot use Run
-                    // Length Encoding).
+                    // There is a difference btween the current and previous pixel: cannot use Run
+                    // Length Encoding.
                 } else {
                     // If there is an existing run, but current pixel have changed,
                     // encode the run (and resets it) before moving onto the current pixel
@@ -193,7 +193,7 @@ public class QOI {
     } // write
 
     public static void main(String[] args) throws IOException {
-        File file = new File("qoi_test_images/3x3.png");
+        File file = new File("qoi_test_images/wikipedia_008.png");
         BufferedImage img = ImageIO.read(file);
         QOI.write(img, "testout.bin");
     } // main

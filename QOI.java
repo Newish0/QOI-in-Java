@@ -6,16 +6,17 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.awt.Color;
 
 /**
- * An QOI encoder written in Java.
+ * An QOI encoder and decoder written in Java.
  * QOI Documentation: https://qoiformat.org/qoi-specification.pdf
  * Tutorial referenced (TS implementation):
  * https://www.youtube.com/watch?v=GgsRQuGSrc0
  */
 
-public class Encoder {
+public class QOI {
 
     final static int QOI_HEADER_SIZE = 14; // header size is 14 bytes
     final static byte[] QOI_END_MARKER = { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1 };
@@ -29,7 +30,7 @@ public class Encoder {
     final static byte QOI_OP_RGB = (byte) 0xfe; // 0b11111110
     final static byte QOI_OP_RGBA = (byte) 0xff; // 0b11111111
 
-    // Returns a difference in Color (as int RGBA)
+    // Returns a difference in Color as an byte array: {Red, Green, Blue, Alpha}
     private static byte[] colorDiff(Color a, Color b) {
         // NOTE: Must cast to byte to take advantage of wrap around
         byte[] diff = {
@@ -41,7 +42,7 @@ public class Encoder {
         return diff;
     } // colorDiff
 
-    public static void encode(BufferedImage img) {
+    public static byte[] encode(BufferedImage img) {
         int width = img.getWidth();
         int height = img.getHeight();
 
@@ -176,41 +177,24 @@ public class Encoder {
             bytes[index++] = b;
         } // for
 
-        
-
-        // Write byte array as file
-        File outputFile = new File("output.qoi");
-        try (FileOutputStream outputStream = new FileOutputStream(outputFile)) {
-
-            BufferedOutputStream bos = new BufferedOutputStream(outputStream);
-
-            // Write until the end of file (not including unused bytes)
-            for (int i = 0; i < index; i++) {
-                bos.write(bytes[i]);
-            } // for
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        
+        return Arrays.copyOf(bytes, index);
     } // encode
 
-    // Test driver
+    public static void write(BufferedImage img, String filepath) throws IOException {
+        // Get encoded bytes via QOI.encode()
+        byte[] bytes = QOI.encode(img);
+
+        // Write byte array as QOI file
+        File outputFile = new File(filepath);
+        FileOutputStream outputStream = new FileOutputStream(outputFile);
+        BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(outputStream);
+        bufferedOutputStream.write(bytes);
+        bufferedOutputStream.close();
+    } // write
+
     public static void main(String[] args) throws IOException {
-
-        File file = new File("qoi_test_images/wikipedia_008.png");
-        // File file = new File("qoi_test_images/testcard.png");
-        // File file = new File("qoi_test_images/3x3.png");
-        // File file = new File("qoi_test_images/qoi_logo.png");
-
-        // Read image file
+        File file = new File("qoi_test_images/3x3.png");
         BufferedImage img = ImageIO.read(file);
-
-        // Send image to encoder
-
-        long startTime = System.currentTimeMillis();
-       
-        Encoder.encode(img);
-
-        System.out.println(System.currentTimeMillis() - startTime);
+        QOI.write(img, "testout.bin");
     } // main
-} // Encoder
+}

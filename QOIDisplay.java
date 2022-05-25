@@ -5,11 +5,10 @@ import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
+/**
+ * Quickly display the decoded QOI image during testing.
+ * Source: https://stackoverflow.com/questions/14353302/displaying-image-in-java
  */
-
 public class QOIDisplay {
 
     public static void main(String avg[]) throws IOException, QOIException {

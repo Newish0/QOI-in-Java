@@ -371,6 +371,8 @@ public class QOI {
         // Use position of end marker to determine when to end decoder if
         // useEndMarker is true.
         if (useEndMarker) {
+            // Assume end marker is at (if not near) the end of the file.
+            // Hence loop in reversed to increase efficiency.
             for (int i = bytes.length - 1; i >= QOI_HEADER_SIZE; i--) {
                 if (isAtQOIEndMarker(bytes, i)) {
                     endIndex = i;

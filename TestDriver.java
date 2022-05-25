@@ -8,6 +8,7 @@ public class TestDriver {
         // Benchmark
         File file = new File("qoi_test_images/wikipedia_008.png");
         BufferedImage input = ImageIO.read(file);
+        
         System.out.println("wikipedia_008.png Benchmark");
         long st = System.currentTimeMillis();
         byte[] bytes = QOI.encode(input);
@@ -16,5 +17,6 @@ public class TestDriver {
         st = System.currentTimeMillis();
         BufferedImage decodedImg = QOI.decode(bytes);
         System.out.println("Decode (ms): " + (System.currentTimeMillis() - st));
+        
     }
 }

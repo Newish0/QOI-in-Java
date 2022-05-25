@@ -548,7 +548,7 @@ public class QOI {
         QOI.write(ImageIO.read(file), "testout.qoi");
 
         long st = System.currentTimeMillis();
-        BufferedImage img = read("testout.qoi");
+        BufferedImage img = QOI.read("testout.qoi");
         System.out.println(System.currentTimeMillis() - st);
     } // main
 }

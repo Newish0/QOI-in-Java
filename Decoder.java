@@ -64,7 +64,7 @@ public class Decoder {
         int index = 0; // Keep track of the index in bytes array
 
         // Header size is 14 bytes, so if input bytes must be at least 14 bytes
-        if (bytes.length < 14) {
+        if (bytes.length < QOI_HEADER_SIZE + QOI_END_MARKER_SIZE) {
             throw new QOIHeaderException("Data is not in QOI format.");
         }
 
@@ -129,96 +129,27 @@ public class Decoder {
         } // for
 
         // Read until the last 8 ending bits
-        while (index < bytes.length - 8 && !isEndMark(bytes, index - 1)) {
+
+        while (index < bytes.length - QOI_END_MARKER_SIZE) { // TODO && !isEndMark(bytes, index - 1)
             // System.out.println("i: " + index);
             // System.out.println(bytes.length - index);
 
-            if(pixelNumber / width > 858) {
-                System.out.println(Arrays.toString(Arrays.copyOfRange(bytes, index - 10, index + 10)));
-                break;
-            }
-
+            // if (pixelNumber / width > 256) {
+            // System.out.println(Arrays.toString(Arrays.copyOfRange(bytes, index - 10,
+            // index + 10)));
+            // break;
+            // }
 
             byte curByte = bytes[index++]; // The current byte we are reading
-            byte curByte2B = (byte) (curByte & 0b11000000);
+            byte curByte2BitTag = (byte) (curByte & 0b11000000); // Mask chuck to obtain 2 bit tag
             Color color = null; // The current pixel
 
-            // If tag is 1 1, decode as Run Length
-            if (curByte2B == QOI_OP_RUN) {
-                int run = (curByte & 0b00111111) & 0xff; // Read byte and convert to unsigned byte as an integer.
-
-                color = prevPixel;
-
-                for (int i = 0; i < run; i++) {
-                    setPixel(img, pixelNumber, color);
-                    pixelNumber++;
-                }
-
-                // System.out.println("Run Length: " + curByte);
-            } else if (curByte2B == QOI_OP_LUMA) {
-                // Read difference in green
-                byte dg = (byte) (curByte & 0b00111111);
-
-                // Read the next byte
-                byte dr_dg_db_dg = bytes[index++];
-
-                // Read the red channel difference minus green channel difference
-                byte dr_dg = (byte) (dr_dg_db_dg >> 4);
-                byte db_dg = (byte) (dr_dg_db_dg & 0b00001111);
-
-                // Calculate dr & db
-                byte dr = (byte) (dr_dg + dg);
-                byte db = (byte) (db_dg + dg);
-
-                // Previous pixel data
-                byte pr = (byte) prevPixel.getRed();
-                byte pg = (byte) prevPixel.getGreen();
-                byte pb = (byte) prevPixel.getBlue();
-                int pa = prevPixel.getAlpha();
-
-                // Set current color the difference from the previous pixel
-                // after convert the byte to unsigned
-                color = new Color((pr - dr) & 0xff, (pg - dg) & 0xff, (pb - db) & 0xff, pa);
-
-                // Write the pixel onto the image
-                setPixel(img, pixelNumber++, color);
-
-                // System.out.println("Luma Diff: " + curByte);
-            } else if (curByte2B == QOI_OP_DIFF) {
-                // Read difference in RGB current byte
-                byte dr = (byte) ((curByte & 0b00110000) >> 4);
-                byte dg = (byte) ((curByte & 0b00001100) >> 2);
-                byte db = (byte) (curByte & 0b00000011);
-
-                // Previous pixel data
-                byte pr = (byte) prevPixel.getRed();
-                byte pg = (byte) prevPixel.getGreen();
-                byte pb = (byte) prevPixel.getBlue();
-                int pa = prevPixel.getAlpha();
-
-                // Set current color the difference from the previous pixel
-                // after convert the byte to unsigned
-                color = new Color((pr - dr) & 0xff, (pg - dg) & 0xff, (pb - db) & 0xff, pa);
-
-                // Write the pixel onto the image
-                setPixel(img, pixelNumber++, color);
-
-                // System.out.println("RGB Diff: " + curByte);
-            } else if (curByte2B == QOI_OP_INDEX) {
-                // Read index from the first 6 bit of the current byte
-                int indexInSeenPixels = (curByte & 0b00111111) & 0xff;
-
-                color = seenPixels[indexInSeenPixels];
-
-                // Write the pixel onto the image
-                setPixel(img, pixelNumber++, color);
-
-                // System.out.println("Index: " + curByte);
-            } else if (curByte == QOI_OP_RGB) {
+            // NOTE: Order at which we check the encoding method matters.
+            if (curByte == QOI_OP_RGB) {
                 // Read RGB from the next 3 bytes
-                byte red = bytes[index++];
-                byte green = bytes[index++];
-                byte blue = bytes[index++];
+                int red = bytes[index++] & 0xff;
+                int green = bytes[index++] & 0xff;
+                int blue = bytes[index++] & 0xff;
 
                 // Set current color as the read RGB values
                 color = new Color(red, green, blue);
@@ -229,10 +160,10 @@ public class Decoder {
                 // System.out.println("RGB: " + curByte);
             } else if (curByte == QOI_OP_RGBA) {
                 // Read RGBA from the next 4 bytes
-                byte red = bytes[index++];
-                byte green = bytes[index++];
-                byte blue = bytes[index++];
-                byte alpha = bytes[index++];
+                int red = bytes[index++] & 0xff;
+                int green = bytes[index++] & 0xff;
+                int blue = bytes[index++] & 0xff;
+                int alpha = bytes[index++] & 0xff;
 
                 // Set current color as the read RGBA values
                 color = new Color(red, green, blue, alpha);
@@ -241,8 +172,84 @@ public class Decoder {
                 setPixel(img, pixelNumber++, color);
 
                 // System.out.println("RGBA: " + curByte);
+            } else if (curByte2BitTag == QOI_OP_RUN) {
+                int run = ((curByte & 0b00111111) & 0xff) + 1; // Read byte and convert to unsigned byte as an integer.
+                                                               // And +1 bias
+                color = prevPixel;
+
+                for (int i = 0; i < run; i++) {
+                    setPixel(img, pixelNumber++, prevPixel);
+                }
+
+                // System.out.println("Run Length: " + curByte);
+            } else if (curByte2BitTag == QOI_OP_DIFF) {
+                // Read difference in RGB current byte
+                byte dr = (byte) (((curByte & 0b00110000) >> 4) - 2);
+                byte dg = (byte) (((curByte & 0b00001100) >> 2) - 2);
+                byte db = (byte) ((curByte & 0b00000011) - 2);
+
+                // Previous pixel data
+                byte pr = (byte) prevPixel.getRed();
+                byte pg = (byte) prevPixel.getGreen();
+                byte pb = (byte) prevPixel.getBlue();
+                int pa = prevPixel.getAlpha();
+
+                // Set current color the difference from the previous pixel
+                // after convert the byte to unsigned
+                color = new Color((dr + pr) & 0xff, (dg + pg) & 0xff, (db + pb) & 0xff, pa);
+
+                // Write the pixel onto the image
+                setPixel(img, pixelNumber++, color);
+
+                // System.out.println("RGB Diff: " + curByte);
+            } else if (curByte2BitTag == QOI_OP_LUMA) {
+                // Read difference in green and revert the bias of 32.
+                byte dg = (byte) ((curByte & 0b00111111) - 32);
+
+                // Read the next byte
+                byte dr_dg_db_dg = bytes[index++];
+
+                // Read the red channel difference minus green channel difference
+                // and revert the bias of 8 on both.
+                byte dr_dg = (byte) (((dr_dg_db_dg & 0b11110000) >> 4) - 8);
+                byte db_dg = (byte) ((dr_dg_db_dg & 0b00001111) - 8);
+
+                // Calculate dr & db.
+                byte dr = (byte) (dr_dg + dg);
+                byte db = (byte) (db_dg + dg);
+
+                // Previous pixel data.
+                byte pr = (byte) prevPixel.getRed();
+                byte pg = (byte) prevPixel.getGreen();
+                byte pb = (byte) prevPixel.getBlue();
+                int pa = prevPixel.getAlpha();
+
+                // Set current color the difference from the previous pixel
+                // after convert the byte to unsigned.
+                color = new Color((dr + pr) & 0xff, (dg + pg) & 0xff, (db + pb) & 0xff, pa);
+
+                // Write the pixel onto the image
+                setPixel(img, pixelNumber++, color);
+
+                // System.out.println("Luma Diff: " + curByte);
+            } else if (curByte2BitTag == QOI_OP_INDEX) {
+                // Read index from the first 6 bit of the current byte
+                int indexInSeenPixels = (curByte & 0b00111111) & 0xff;
+
+                color = seenPixels[indexInSeenPixels];
+
+                // Write the pixel onto the image
+                setPixel(img, pixelNumber++, color);
+
+                // System.out.println("Used index " + indexInSeenPixels);
+
+                // System.out.println("Index: " + curByte);
             } else {
                 System.out.println("Number (ERROR): " + curByte);
+            }
+
+            if (color == null) {
+                System.out.println("???");
             }
 
             // Add current pixel to seenPixels
@@ -250,6 +257,7 @@ public class Decoder {
             int hash = (color.getRed() * 3 + color.getGreen() * 5 + color.getBlue() * 7 + color.getAlpha() * 11)
                     % 64;
             seenPixels[hash] = color; // Record color into seenPixels.
+            prevPixel = color;
 
         }
 
@@ -260,6 +268,7 @@ public class Decoder {
         // File file = new File("3x3.qoi");
         // File file = new File("10x1-rltest.qoi");
         File file = new File("qoi_test_images/wikipedia_008.qoi");
+        // File file = new File("qoi_test_images/testcard.qoi");
         FileInputStream inStream = new FileInputStream(file);
         byte[] bytes = inStream.readAllBytes();
 

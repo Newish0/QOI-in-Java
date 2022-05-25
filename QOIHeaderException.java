@@ -1,4 +1,4 @@
-public class QOIHeaderException extends Exception{
+public class QOIHeaderException extends QOIException{
     public QOIHeaderException() {
         super();
     }

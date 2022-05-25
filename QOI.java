@@ -1,4 +1,3 @@
-import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.awt.image.ColorModel;
 import java.io.BufferedOutputStream;
@@ -541,14 +540,4 @@ public class QOI {
         inStream.close();
         return QOI.decode(bytes);
     }
-
-    // Test driver
-    public static void main(String[] args) throws IOException, QOIException {
-        File file = new File("qoi_test_images/wikipedia_008.png");
-        QOI.write(ImageIO.read(file), "testout.qoi");
-
-        long st = System.currentTimeMillis();
-        BufferedImage img = QOI.read("testout.qoi");
-        System.out.println(System.currentTimeMillis() - st);
-    } // main
-}
+} // QOI
